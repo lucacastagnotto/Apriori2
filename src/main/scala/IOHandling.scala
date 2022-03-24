@@ -1,8 +1,9 @@
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.SparkSession
-import scala.collection.mutable.Map
-import scala.collection.mutable.Set
+import scala.collection.mutable //.{ListBuffer, Map, Set}
+import collection.mutable.ListBuffer
+import collection.mutable.Map
 
 object IOHandling {
 
@@ -60,59 +61,70 @@ object IOHandling {
 
     val transactionSetCollected = transactionSet.collect()
 
-    //println(transactionSetCollected.getClass)
-
-    // transactionSet.take(20).foreach(println)
-
-    // costants
+    // costants and variables
     val totalTransactions = transactionSet.count()
     var size = 0 // # distinct movies
-
+    val singleton_counts = Map[Int, Int]()
+    var transactions : ListBuffer[Set[Int]] = ListBuffer()
 
     // create L1
-
-    //L1: Set[Itemset]
-
-    // Itemset: Tuple(String, Int)
-    // Itemset: Tuple(List[String], Int)
-
-    val singleton_counts = Map[String, Int]()
-
-    // transactionSetCollected: Tuple
-    // transaction: Tuple(String, Seq)
-
     for(transaction <- transactionSetCollected){
-      val items_set = transaction._2
-      //transactions += items_set
+      // transaction = (273, Seq(1, ... , 30492) : (Any, Iterable[Any])
+      var item_set = Set[Int]()
+      transaction._2.foreach(movieId => {
+        val movieId_int = movieId.toString.toInt
+        item_set += movieId_int
+      })
+      transactions += item_set
       size = size + 1
-      for(item <- items_set){
-        if(!singleton_counts.contains(item.toString)){
-          singleton_counts(item.toString) = 0
+      for(item <- item_set){
+        if(!singleton_counts.contains(item)){
+          singleton_counts(item) = 0
         }
-        singleton_counts(item.toString) = singleton_counts(item.toString) + 1
+        singleton_counts(item) = singleton_counts(item) + 1
       }
     }
 
     val min_support = 70.toDouble/totalTransactions * size
 
-    val frequent_itemset_1 = Set[String]()
     val frequent_item_counts = singleton_counts.filter( x => x._2 >= min_support)
+    // Valid itemset
+    var frequent_items = frequent_item_counts.keys.toList.sorted // Why sorted?
 
-    // frequent_item_counts.foreach(println)
+    var frequent_itemsets: List[List[Int]] = List()
+    // Add L1-itemsets to frequent_itemsets
+    frequent_itemsets ++= frequent_item_counts.map(x => List(x._1))
 
+    var k : Int = 2 // starting to generate from pairs
 
+    def getFilteredItemsets(transactions: ListBuffer[Set[Int]], itemsets: Set[Set[Int]], min_support: Double): (Set[List[Int]], Set[Int]) = {
+      for(candidate <- itemsets){
+        println("candidate: " + candidate)
+        for(my_subset <- candidate.subsets(k-1)) {
+          if(!frequent_itemsets.contains(my_subset.toList)) {
+            println("candidate: " + candidate + "my_subset: " + my_subset)
 
-    // alg apriori
+          }
+        }
+      }
+      // itemsets -= pruned_candidates
+      val filteredItemsets = itemsets.map{
+        itemset => (itemset, transactions.count(transaction => itemset.subsetOf(transaction)))
+      }.filter(x => x._2 > min_support).map(x => x._1.toList)
+      val frequent_items = filteredItemsets.map(x => x.toSet).reduce((x, y) => x ++ y) // Handle case empty list (Empty.reduce)
+      (filteredItemsets, frequent_items)
+    }
 
-    /*
-    var new_df = df_full.select("movieId").distinct
-    new_df.show(false)
-
-    val frequent_1 = new_df.rdd.map(x => x)
-
-    var k = 2*/
-
-
+    //Generate all other size itemsets. Loop runs till no new candidates are generated.
+    while(frequent_items.nonEmpty){
+      // Candidate generation
+      val candidates = frequent_items.toSet.subsets(k)
+      val temp_frequent_itemsets = getFilteredItemsets(transactions, candidates.toSet, min_support)
+      frequent_items = temp_frequent_itemsets._2.toList.sorted
+      frequent_itemsets ++= temp_frequent_itemsets._1.toList.map(x => x.sorted)
+      println(frequent_itemsets)
+      k = k + 1
+    }
   }
 
   def alg_apriori(df_full: DataFrame) = {
