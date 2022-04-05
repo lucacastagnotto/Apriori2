@@ -63,7 +63,7 @@ object IOHandling {
 
     // costants and variables
     val totalTransactions = transactionSet.count()
-    var size = 0 // # distinct movies
+    var size = 0
     val singleton_counts = Map[Int, Int]()
     var transactions : ListBuffer[Set[Int]] = ListBuffer()
 
@@ -85,34 +85,36 @@ object IOHandling {
       }
     }
 
-    val min_support = 70.toDouble/totalTransactions * size
+    //val min_support = 70.toDouble/totalTransactions * size
+    val min_support = 0.2 * totalTransactions
 
     val frequent_item_counts = singleton_counts.filter( x => x._2 >= min_support)
     // Valid itemset
     var frequent_items = frequent_item_counts.keys.toList.sorted // Why sorted?
 
-    var frequent_itemsets: List[List[Int]] = List()
+    //frequent_items.foreach(println)
+
+    //var frequent_itemsets: List[List[Int]] = List()
+    var frequent_itemsets: List[(List[Int], Int)] = List()
     // Add L1-itemsets to frequent_itemsets
-    frequent_itemsets ++= frequent_item_counts.map(x => List(x._1))
+    frequent_itemsets ++= frequent_item_counts.map(x => (List(x._1), x._2))
+
+    //println("l1 generated: " + frequent_itemsets.size)
 
     var k : Int = 2 // starting to generate from pairs
 
-    def getFilteredItemsets(transactions: ListBuffer[Set[Int]], itemsets: Set[Set[Int]], min_support: Double): (Set[List[Int]], Set[Int]) = {
-      for(candidate <- itemsets){
-        println("candidate: " + candidate)
-        for(my_subset <- candidate.subsets(k-1)) {
-          if(!frequent_itemsets.contains(my_subset.toList)) {
-            println("candidate: " + candidate + "my_subset: " + my_subset)
-
-          }
-        }
-      }
+    def getFilteredItemsets(transactions: ListBuffer[Set[Int]], itemsets: Set[Set[Int]], min_support: Double): (Set[(List[Int], Int)], Set[Int]) = {
       // itemsets -= pruned_candidates
       val filteredItemsets = itemsets.map{
         itemset => (itemset, transactions.count(transaction => itemset.subsetOf(transaction)))
-      }.filter(x => x._2 > min_support).map(x => x._1.toList)
-      val frequent_items = filteredItemsets.map(x => x.toSet).reduce((x, y) => x ++ y) // Handle case empty list (Empty.reduce)
-      (filteredItemsets, frequent_items)
+      }.filter(x => x._2 >= min_support).map(x => (x._1.toList, x._2))
+
+      var frequent_items : Set[Int] = Set()
+      if(!filteredItemsets.isEmpty){
+        frequent_items = filteredItemsets.map(x => x._1.toSet).reduce((x, y) => x ++ y) // generate the Set with every element in filteredItemsets // Handle case empty list (Empty.reduce)
+      }
+
+      (filteredItemsets, frequent_items.to(collection.immutable.Set))
     }
 
     //Generate all other size itemsets. Loop runs till no new candidates are generated.
@@ -121,19 +123,12 @@ object IOHandling {
       val candidates = frequent_items.toSet.subsets(k)
       val temp_frequent_itemsets = getFilteredItemsets(transactions, candidates.toSet, min_support)
       frequent_items = temp_frequent_itemsets._2.toList.sorted
-      frequent_itemsets ++= temp_frequent_itemsets._1.toList.map(x => x.sorted)
-      println(frequent_itemsets)
+      frequent_itemsets ++= temp_frequent_itemsets._1.toList.map(x => x)
       k = k + 1
     }
-  }
 
-  def alg_apriori(df_full: DataFrame) = {
-    // Generare L1
-    var frequent_1 = List()
-
-    var new_df = df_full.select("movieId").distinct()
-    new_df.show(false)
-
+    println("# frequent_itemsets: " + frequent_itemsets.size)
+    frequent_itemsets.foreach(println)
 
   }
 }

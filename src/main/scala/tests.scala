@@ -81,7 +81,9 @@ object apriori_test {
       }
     }
 
-    val min_support = 70.toDouble/totalTransactions * size
+    val min_s = 0.12
+    val min_support = min_s * totalTransactions
+
 
     val frequent_item_counts = singleton_counts.filter( x => x._2 >= min_support)
     // Valid itemset
@@ -98,7 +100,7 @@ object apriori_test {
       val outloop = new Breaks;
       val inloop = new Breaks;
 
-      println("starting itemsets size: " + itemsets.size)
+      println("starting candidate size: " + itemsets.size)
       var pruned = 0
 
       var mutable_itemsets = itemsets.to(collection.mutable.Set)
@@ -118,7 +120,7 @@ object apriori_test {
       }
 
       println("candidates eliminated after pruning: " + pruned)
-      println("itemsets size after pruning: " + mutable_itemsets.size)
+      println("candidate size after pruning: " + mutable_itemsets.size)
 
       // Test AREA
       /*var prunedItemsets = itemsets.map{
@@ -188,6 +190,8 @@ object apriori_test {
       frequent_items = temp_frequent_itemsets._2.toList.sorted // Why do we convert into List? It can remain Set as we need it as Set for candidates generation, 2 lines above
       frequent_itemsets ++= temp_frequent_itemsets._1.toList.map(x => x.sorted)
       k = k + 1
+
+      frequent_itemsets.foreach(println)
     }
   }
 }
