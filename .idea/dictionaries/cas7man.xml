@@ -2,6 +2,7 @@
   <dictionary name="cas7man">
     <words>
       <w>itemset</w>
+      <w>itemsets</w>
     </words>
   </dictionary>
 </component>

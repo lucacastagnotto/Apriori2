@@ -1,10 +1,8 @@
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.SparkSession
 
 import collection.mutable.ListBuffer
-import collection.mutable.Map
 //import collection.mutable.Set
 
 object rdd3 {
@@ -53,15 +51,13 @@ object rdd3 {
     ds_full = ds_full.filter(ds_full("rating") >= 3)
 
     val transactions = ds_full.rdd.map(row => (row(1), row(0))).groupByKey().map(t => t._2.map(_.toString.toInt)).repartition(5)
-
     val totalTransactions = transactions.count().toInt
-    val min_support = 0.12
+    val min_support = 0.2
     val total_support = min_support * totalTransactions
 
-    println("total support: " + total_support)
+    //println("total support: " + total_support)
 
     val frequent_singleton = transactions.flatMap(transaction => transaction.map(movieId => (movieId, 1))).reduceByKey((x, y) => x + y).filter(x => x._2 >= total_support).map(_._1).collect()
-
     var frequent_single_items = scala.collection.mutable.Set[Int]()
     var l1 = scala.collection.mutable.Set[List[Int]]()
     for(movieId <- frequent_singleton){
@@ -88,7 +84,6 @@ object rdd3 {
           }
         }
       }
-
       mutable_filteredItemsets.iterator
     }
 
@@ -97,7 +92,6 @@ object rdd3 {
     while(frequent_single_items.nonEmpty) {
       val all_possible_candidates = frequent_single_items.to(collection.immutable.Set).subsets(k).toSet
       val candidatesPartitions = transactions.mapPartitions(x => candidate_gen(x, last_frequent_itemset, all_possible_candidates, k))
-
       val frequent_itemsets = candidatesPartitions.reduceByKey((x,y) => x + y).filter(z => z._2 >= total_support)
 
       if(frequent_itemsets.isEmpty()){
@@ -107,13 +101,11 @@ object rdd3 {
         frequent_single_items = frequent_itemsets.map(x => x._1.toSet).reduce((x, y) => x ++ y).to(collection.mutable.Set)
       }
       last_frequent_itemset = frequent_itemsets.map(x => x._1).collect().to(collection.mutable.Set)
-
-      frequent_itemsets.foreach(println)
-
       k = k + 1
 
+      val sorted_freq_it = frequent_itemsets.collect().sortBy(_._2)
+      sorted_freq_it.foreach(println)
+      //frequent_itemsets.foreach(println)
     }
-
-
   }
 }
